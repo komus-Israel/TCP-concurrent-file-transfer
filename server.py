@@ -2,7 +2,6 @@ import socket
 import sys
 import threading
 import time
-import tqdm
 import os
 
 
@@ -52,13 +51,17 @@ def handle_clients(client):
 			length = len(data)
 		try:
 
-			#if len(data) < 2:
-			#	pass
-			#else:
-				progress = tqdm.tqdm(range(length), f"Receiving {filename}", unit = "B", unit_scale = True, unit_divisor=1024)
+			if len(data) < 2:
+				pass
+			else:
+
+				checksum = length/1048576
+				print(f"Receiving {filename} : [{'{0:.1f}'.format(checksum)}M]")
 				with open(os.path.join(download_path, filename) , 'wb') as file:			
 					file.write(data)
-					progress.update(len(data))
+					progress = length/1048576
+				print(f"Received {filename} : [{'{0:.1f}'.format(checksum)}M\{'{0:.1f}'.format(checksum)}M]")
+
 				print()
 		except FileNotFoundError as e:
 			pass
@@ -83,19 +86,17 @@ for i in range(int(no_files)):
 
 	if int(concurrency) == 1:
 		client, address = server.accept()
-		print(f"{address} is connected")
+		#print(f"{address} is connected")
 
 		handle_clients(client)
 	else:
 		client, address = server.accept()
-		print(f"{address} is connected")
+		#print(f"{address} is connected")
 
-		try:
-			thread = threading.Thread(target = handle_clients, args = [client])
-			thread.start()
-		except AssertionError as e:
-			pass
-	
+		
+		thread = threading.Thread(target = handle_clients, args = [client])
+		thread.start()
+		
 
 
 
