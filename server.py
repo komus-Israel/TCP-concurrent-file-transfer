@@ -2,7 +2,6 @@ import socket
 import sys
 import threading
 import time
-import tqdm
 import os
 
 
@@ -25,9 +24,11 @@ no_files, concurrency  = client.recv(1024).decode().split(SEPARATOR)
 client.close()
 
 
-'''
-	The download path for the server needs to created if it doesnt exist
-'''
+
+#	The download path for the server needs to created if it doesnt exist.
+
+#	If it exist, then it won't be created
+
 
 download_path = os.path.join(os.getcwd(), 'server_files')
 os.makedirs(download_path, exist_ok = True)
@@ -50,14 +51,17 @@ def handle_clients(client):
 			length = len(data)
 		try:
 
-			#if len(data) < 2:
-			#	pass
-			#else:
-				progress = tqdm.tqdm(range(length), f"Receiving {filename}", unit = "B", unit_scale = True, unit_divisor=1024)
-				with open(os.path.join(download_path,filename) , 'wb') as file:			
+			if len(data) < 2:
+				pass
+			else:
+
+				checksum = length/1048576
+				print(f"Receiving {filename} : [{'{0:.1f}'.format(checksum)}M]")
+				with open(os.path.join(download_path, filename) , 'wb') as file:			
 					file.write(data)
-					progress.update(len(data))
-				progress.close()
+					progress = length/1048576
+				print(f"Received {filename} : [{'{0:.1f}'.format(checksum)}M\{'{0:.1f}'.format(checksum)}M]")
+
 				print()
 		except FileNotFoundError as e:
 			pass
@@ -65,12 +69,13 @@ def handle_clients(client):
 			client.close()
 
 
-'''
-	This thread handles all connected clients concurrently. It ensures that 
-	the files are received from connected clients concurrently because the clients are  connected concurrently.
 
-	However, if concurrency == 1, the files are sent one by one. concurrency greater than two are handled concurrently
-'''
+#	This thread handles all connected clients concurrently. It ensures that 
+
+#	the files are received from connected clients concurrently because the clients are  connected concurrently.
+
+#	However, if concurrency == 1, the files are sent one by one. concurrency greater than two are handled concurrently
+
 
 
 
@@ -81,15 +86,17 @@ for i in range(int(no_files)):
 
 	if int(concurrency) == 1:
 		client, address = server.accept()
-		print(f"{address} is connected")
+		#print(f"{address} is connected")
 
 		handle_clients(client)
 	else:
 		client, address = server.accept()
-		print(f"{address} is connected")
+		#print(f"{address} is connected")
+
+		
 		thread = threading.Thread(target = handle_clients, args = [client])
 		thread.start()
-	
+		
 
 
 

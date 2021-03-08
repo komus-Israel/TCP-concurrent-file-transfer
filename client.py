@@ -4,6 +4,8 @@ import sys
 import os
 import threading
 import time
+import concurrent.futures
+
 
 
 
@@ -13,12 +15,13 @@ port = 4000
 SEPARATOR = "<SEPARATOR>"
 
 
-'''
-	The folder is received with the commandline argument supplied to the python commandline in index 1.
-	Concurrency is received with argument of index 2
 
-	$python3 client.py folder_sample 5
-'''
+#	The folder is received with the commandline argument supplied to the python commandline in index 1.
+
+#	Concurrency is received with argument of index 2
+
+#	$python3 client.py folder_sample 5
+
 folder = sys.argv[1]
 files = os.listdir(folder)
 file_details = [(file,os.path.getsize(os.path.join(folder, file))) for file in files]
@@ -36,14 +39,14 @@ server.close()
 
 
 
-'''
-	Different files needs to be sent concurrently to the server across different connections.
 
-	Range(files, concurrency) will ensure that the files are sliced according to the concurrency value.
+#	Different files needs to be sent concurrently to the server across different connections.
 
-	In each slice, a connection is mapped to each files in a slice. These connections will be handled concurrently by the server.
+#	Range(files, concurrency) will ensure that the files are sliced according to the concurrency value.
 
-'''
+#	In each slice, a connection is mapped to each files in a slice. These connections will be handled concurrently by the server.
+
+
 def Range(files,concurrency):
     d = concurrency
     b = 0
@@ -57,44 +60,47 @@ def Range(files,concurrency):
     return(List)
 
 
-'''
-	The slicing occurs here with the Range() function
 
-'''
+#	The slicing occurs here with the Range() function
 
 to_send = [segments for segments in Range(file_details, int(concurrency))]
 
 
-'''
-		Upload(conn, meta) handles the file transfer. 
 
-		conn --> connection
-		meta --> the key containing a tuple of filename and size
-'''
+#	Upload(conn, meta) handles the file transfer. 
+
+#	conn --> connection
+
+#	meta --> the key containing a tuple of filename and size
 
 
-def upload(conn, meta):
-	filename = meta[conn][0]
-	filesize = meta[conn][1]
+def upload(conn):
+	filename = socket_with_file_dic[conn][0]
+	filesize = socket_with_file_dic[conn][1]
 	conn.sendall(f"{filename}".encode() + b'\n')
 	progress = tqdm.tqdm(range(filesize), f"sending {filename}", unit = "B", unit_scale = True, unit_divisor=1024)
 	with open(os.path.join(folder, filename), 'rb') as f:
 		data = f.read()
-		conn.sendall(data)
 		progress.update(len(data))
-	progress.close()
-
-	print()
-	print(f"********************{filename} sent********************")
-	print()
+		conn.sendall(data)
+		progress.close()
 
 
-'''
-	A loop is created to loop through the list of sliced files to be sent.  A connection is mapped to a file each and sent to the server.
+#	A loop is created to loop through the list of sliced files to be sent. 
 
-	As the connections are being created, the server handles the connections concurrently. The files are sents in batches of the concurrency value
-'''
+#	A connection is mapped to a file each and sent to the server.
+
+# 	As the connections are being created, the server handles the connections concurrently. 
+
+#	The files are sents in batches of the concurrency value
+
+
+
+	
 start = time.perf_counter()
+
+# a loop is initiated to get the slice containing the files to be sent at once
+
 for file in to_send:
 	
 	connections = [socket.socket() for sock in range(int(concurrency))]
@@ -104,16 +110,20 @@ for file in to_send:
 
 	socket_with_file = zip(connections, file)
 	socket_with_file_dic = dict(socket_with_file)
-
-	for conn in socket_with_file_dic:
-		upload(conn, socket_with_file_dic)
+	with concurrent.futures.ThreadPoolExecutor() as executor:
+		executor.map(upload, (socket_with_file_dic))
 finish = time.perf_counter()
 
-'''
-	The total time taken to send all the files across all connections is computed
-'''
 
-throughput = round(round(finish-start, 2)/len(files), 2)
+#	concurrent.futures is used to send the files in a slice concurrently. 
+
+#	So if 5 files are in a slice, the five files won't be sent one by one but concurrently. 
+
+#	The server has also been setup to handle the file downloads concurrenly
+
+#	The total time taken to send all the files across all connections is computed
+
+throughput = round(len(files)/round(finish-start, 2), 2)
 
 print(f'''
 
